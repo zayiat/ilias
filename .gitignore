@@ -1,0 +1,214 @@
+# Superpowers working documents
+/docs/superpowers/
+
+# Git worktrees
+/.worktrees/
+/worktrees/
+
+# Operating system metadata
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+*.stackdump
+
+# Editors and IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+!.env.sample
+*.local
+*.secret
+*.secrets
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# Logs, diagnostics, and runtime files
+*.log
+logs/
+*.pid
+*.pid.lock
+*.seed
+*.stacktrace
+*.crash
+*.dmp
+
+# Temporary files and caches
+tmp/
+temp/
+.tmp/
+.temp/
+.cache/
+.eslintcache
+.stylelintcache
+.sass-cache/
+.parcel-cache/
+.turbo/
+.nx/
+
+# Test and coverage output
+coverage/
+.coverage
+.coverage.*
+htmlcov/
+.nyc_output/
+.pytest_cache/
+.tox/
+.nox/
+test-results/
+playwright-report/
+
+# Generic build output
+build/
+dist/
+out/
+target/
+bin/
+obj/
+artifacts/
+*.class
+*.o
+*.obj
+*.so
+*.dylib
+*.dll
+*.exe
+
+# JavaScript and TypeScript
+node_modules/
+.pnp
+.pnp.js
+.pnp.cjs
+.yarn/cache/
+.yarn/unplugged/
+.yarn/build-state.yml
+.yarn/install-state.gz
+.next/
+.nuxt/
+.svelte-kit/
+.angular/
+.vite/
+storybook-static/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.venv/
+venv/
+env/
+ENV/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.hypothesis/
+*.egg-info/
+.eggs/
+wheels/
+pip-wheel-metadata/
+
+# Java, Kotlin, and Gradle
+.gradle/
+.kotlin/
+*.hprof
+hs_err_pid*
+replay_pid*
+
+# .NET
+*.user
+*.rsuser
+*.suo
+*.userosscache
+*.sln.docstates
+TestResults/
+packages/
+*.nupkg
+*.snupkg
+
+# Go
+*.test
+*.out
+vendor/
+
+# Rust
+**/*.rs.bk
+
+# PHP and Composer
+vendor/
+.phpunit.result.cache
+.php-cs-fixer.cache
+
+# Ruby
+.bundle/
+.yardoc/
+_yardoc/
+.ruby-lsp/
+
+# Infrastructure and deployment
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.tfstate.lock.info
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.serverless/
+.aws-sam/
+
+# Local databases and generated archives
+*.sqlite
+*.sqlite3
+*.db
+*.bak
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.7z
+
+# Keep dependency lockfiles versioned
+!package-lock.json
+!npm-shrinkwrap.json
+!yarn.lock
+!pnpm-lock.yaml
+!bun.lock
+!bun.lockb
+!poetry.lock
+!Pipfile.lock
+!uv.lock
+!Cargo.lock
+!composer.lock
+!Gemfile.lock
+!packages.lock.json
