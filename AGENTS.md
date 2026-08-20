@@ -5,7 +5,6 @@ This file provides guidance to Codex (openai-codex) when working with code in th
 - Write all repository content in English, including source code, comments,
   documentation, configuration text, issues, task records, commit messages,
   and pull request content.
-- Communicate with the repository owner in German.
 - Never add Codex, AI, or automated-tool authorship or attribution anywhere.
 - Never add `Co-authored-by` or similar trailers that identify Codex, AI, or an
   automated tool.
