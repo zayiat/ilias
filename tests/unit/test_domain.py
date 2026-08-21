@@ -112,6 +112,18 @@ def test_course_rejects_an_identity_from_a_different_instance() -> None:
         )
 
 
+def test_learning_object_rejects_its_id_from_a_different_instance() -> None:
+    with pytest.raises(ValidationError, match="provenance"):
+        LearningObject(
+            id=ObjectId.parse("other:file:17"),
+            object_type=ObjectType.FILE,
+            title="Exercise sheet",
+            parent_id=ObjectId.parse("stuttgart:folder:7"),
+            course_id=ObjectId.parse("stuttgart:course:12345"),
+            provenance=provenance(),
+        )
+
+
 @pytest.mark.parametrize(
     ("parent_id", "course_id"),
     [
