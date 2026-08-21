@@ -1,9 +1,11 @@
 ---
 id: TASK-001.01
 title: Establish the safe ILIAS MCP foundation
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - Eren
 created_date: '2026-08-20 17:03'
+updated_date: '2026-08-21 13:17'
 labels:
   - mcp
   - foundation
@@ -30,3 +32,19 @@ Create the executable Python project foundation and stable normalized language u
 - [ ] #3 Operational logs use stderr and automated tests prove that common credential, session, URL-token, and content values are redacted.
 - [ ] #4 The locked Python 3.12 project passes its focused tests, formatting, linting, and type checks.
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Implement only the foundation scope defined for TASK-001.01, corresponding to Tasks 1 and 2 of docs/superpowers/plans/2026-08-20-ilias-mcp-server-mvp.md.
+
+1. Verify the task branch/workspace baseline and tool availability.
+2. Establish the Python 3.12 uv project, locked dependencies, package metadata, pytest, Ruff, and mypy configuration.
+3. Use strict Red-Green-Refactor cycles to define and implement immutable normalized domain identities and values, bounded pagination, provenance/trust metadata, artifact validation, and stable failures.
+4. Use strict Red-Green-Refactor cycles to implement validated non-secret TOML/environment configuration with safe URLs and bounded cache/request/artifact/result settings.
+5. Use strict Red-Green-Refactor cycles to implement structured stderr-only operational logging with conservative redaction of credentials, sessions, sensitive URL parameters, and authored content.
+6. Run focused tests throughout, then the complete non-live suite, formatting, linting, type checks, dependency lock verification, and diff hygiene.
+7. Obtain task-scoped and final branch reviews; resolve all Critical and Important findings.
+8. Record modified files, objective acceptance-criteria evidence, implementation notes, and final summary in Backlog; mark Done only after reading the finalization guide.
+9. Commit in English without automated authorship, push task-001.01, and create a pull request against main.
+<!-- SECTION:PLAN:END -->
