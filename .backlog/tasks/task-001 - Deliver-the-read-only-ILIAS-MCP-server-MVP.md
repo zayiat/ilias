@@ -18,7 +18,7 @@ documentation:
   - docs/superpowers/plans/2026-08-20-ilias-mcp-server-mvp.md
 priority: high
 type: feature
-ordinal: 1000
+ordinal: 2600
 ---
 
 ## Description
