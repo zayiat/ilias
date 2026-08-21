@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - Eren
 created_date: '2026-08-20 17:03'
-updated_date: '2026-08-21 13:55'
+updated_date: '2026-08-21 14:36'
 labels:
   - mcp
   - foundation
@@ -47,6 +47,8 @@ Implement only the foundation scope defined for TASK-001.01, corresponding to Ta
 7. Obtain task-scoped and final branch reviews; resolve all Critical and Important findings.
 8. Record modified files, objective acceptance-criteria evidence, implementation notes, and final summary in Backlog; mark Done only after reading the finalization guide.
 9. Commit in English without automated authorship, push task-001.01, and create a pull request against main.
+
+10. Final review fix wave: add focused RED regressions for IDNA-canonical hostname safety, required bounded unknown-object raw types, and process-keyed canonical ObjectId pseudonyms; implement the minimal boundary fixes; run focused and full verification; record evidence in the final fix report; commit once.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -61,4 +63,6 @@ Plan Task 1 review fix round 1 completed in commit c325d80. The domain is now pr
 Plan Task 1 review fix round 2 completed in commit 7edd097. Added explicit coverage that a LearningObject primary ID from another instance is rejected while parent, course, and provenance remain on the configured instance. This was coverage completion: the existing validator passed the new test without production changes. Fresh verification: 19 focused domain tests and 31 full tests passed; Ruff lint/format, mypy, uv lock check, and diff check passed. Full evidence is appended to the local Task 1 report.
 
 Plan Task 1 (Python package and domain contract) completed under TDD and passed task-scoped spec/quality review after two fix rounds. Review corrections removed HTTP/filesystem/CLI coupling from the domain, removed the extra tzdata dependency, enforced cross-instance identity cohesion, and expanded stable-error and timestamp validation coverage. Final Task 1 evidence: 31 tests passed plus Ruff, format, mypy, and uv lock checks.
+
+Final review fix wave started. Root-cause review confirmed three boundary issues: hostname safety checks run before IDNA canonicalization; LearningObject does not conditionally require raw_instance_type for unknown objects; logging validates but hashes the unparsed input with unsalted SHA-256. Scope remains limited to Plan Tasks 1-2.
 <!-- SECTION:NOTES:END -->
