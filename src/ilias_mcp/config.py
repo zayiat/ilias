@@ -73,7 +73,10 @@ class Settings(BaseModel):
         ):
             raise ValueError("instance URL must be a credential-free HTTPS base URL")
 
-        hostname = parsed.hostname.rstrip(".").lower()
+        try:
+            hostname = parsed.hostname.encode("idna").decode("ascii").rstrip(".").lower()
+        except UnicodeError as error:
+            raise ValueError("instance URL hostname must be valid IDNA") from error
         if not hostname:
             raise ValueError("instance URL must include a hostname")
         if hostname in {"localhost", "localhost.localdomain"} or hostname.endswith(".localhost"):

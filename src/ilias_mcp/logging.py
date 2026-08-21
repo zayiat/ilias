@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import logging
+import secrets
 import sys
 from datetime import UTC, datetime
 from typing import Any
@@ -30,6 +32,7 @@ _OPERATIONAL_TOOL_NAMES = frozenset(
 )
 _OPERATIONAL_STATUSES = frozenset({"ok", "error", "started", "cancelled", "rate_limited"})
 _ERROR_CODES = frozenset(error_code.value for error_code in ErrorCode)
+_OBJECT_ID_HMAC_KEY = secrets.token_bytes(32)
 
 
 class RedactionFilter(logging.Filter):
@@ -88,13 +91,15 @@ def configure_logging(level: str) -> None:
 
 
 def _anonymize(value: object) -> str:
-    """Return a deterministic identifier suitable for operational correlation."""
+    """Return a process-correlatable identifier that cannot be enumerated offline."""
     try:
-        ObjectId.parse(str(value))
+        object_id = ObjectId.parse(str(value))
     except ValueError:
         return REDACTED
-    digest = hashlib.sha256(str(value).encode("utf-8")).hexdigest()
-    return f"sha256:{digest}"
+    digest = hmac.new(
+        _OBJECT_ID_HMAC_KEY, str(object_id).encode("utf-8"), hashlib.sha256
+    ).hexdigest()
+    return f"hmac-sha256:{digest}"
 
 
 def _sanitize_operational_field(field_name: str, value: object) -> object:

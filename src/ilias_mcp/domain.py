@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 DEFAULT_PAGE_LIMIT = 50
 MAX_PAGE_LIMIT = 100
+MAX_RAW_INSTANCE_TYPE_LENGTH = 128
 
 
 class DomainModel(BaseModel):
@@ -175,6 +176,15 @@ class LearningObject(DomainModel):
             raise ValueError("object_type must match the object ID type")
         if self.course_id.object_type is not ObjectType.COURSE:
             raise ValueError("course_id must have object type course")
+        if self.object_type is ObjectType.UNKNOWN and (
+            self.raw_instance_type is None
+            or not self.raw_instance_type.strip()
+            or len(self.raw_instance_type) > MAX_RAW_INSTANCE_TYPE_LENGTH
+        ):
+            raise ValueError(
+                "raw_instance_type is required and must be nonblank and at most "
+                f"{MAX_RAW_INSTANCE_TYPE_LENGTH} characters for unknown objects"
+            )
         _ensure_instance_cohesion(self.provenance, self.id, self.parent_id, self.course_id)
         return self
 

@@ -113,6 +113,9 @@ def test_settings_defaults_to_the_safe_stuttgart_configuration(
         "https://0.0.0.0",
         "https://[::1]",
         "https://localhost.localdomain",
+        "https://ｌｏｃａｌｈｏｓｔ",
+        "https://localhost。",
+        "https://127。0。0。1",
         "https://ilias3.uni-stuttgart.de:70000",
         "https://ilias3.uni-stuttgart.de:not-a-port",
     ],
@@ -136,6 +139,22 @@ def test_settings_normalizes_a_trailing_dot_in_a_public_instance_hostname(tmp_pa
     settings = Settings.load(config_path)
 
     assert settings.instance_url == "https://ilias3.uni-stuttgart.de"
+
+
+def test_settings_canonicalizes_a_unicode_public_hostname_to_ascii(tmp_path: Path) -> None:
+    """Break caught: rejecting all non-ASCII hosts would block valid public IDNA names."""
+    config_path = tmp_path / "ilias-mcp.toml"
+    config_path.write_text('[instance]\nurl = "https://bücher.de/"\n', encoding="utf-8")
+
+    settings = Settings.load(config_path)
+
+    assert settings.instance_url == "https://xn--bcher-kva.de"
+
+
+def test_settings_rejects_a_hostname_that_cannot_be_converted_to_idna() -> None:
+    """Break caught: malformed Unicode hostnames can pass safety checks in an ambiguous form."""
+    with pytest.raises(ValidationError, match="instance URL"):
+        Settings(instance_url="https://\ud800.example")
 
 
 @pytest.mark.parametrize("directory", ["", "~", "."])

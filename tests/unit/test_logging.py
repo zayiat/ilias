@@ -1,3 +1,4 @@
+import hashlib
 import json
 import logging
 import sys
@@ -5,6 +6,13 @@ import sys
 import pytest
 
 from ilias_mcp.logging import RedactionFilter, configure_logging
+
+
+def _pseudonymize_object_id(value: str) -> str:
+    record = logging.LogRecord("ilias_mcp.test", logging.INFO, __file__, 1, "message", (), None)
+    record.object_id = value
+    assert RedactionFilter().filter(record)
+    return record.object_id
 
 
 @pytest.mark.parametrize(
@@ -69,7 +77,7 @@ def test_configure_logging_emits_structured_redacted_logs_to_stderr_only(
     assert payload["tool"] == "list_courses"
     assert payload["duration_ms"] == 12
     assert payload["status"] == "ok"
-    assert payload["object_id"].startswith("sha256:")
+    assert payload["object_id"].startswith("hmac-sha256:")
     assert "12345" not in captured.err
     assert "Private course material" not in captured.err
     assert "content" not in payload
@@ -157,7 +165,34 @@ def test_stderr_logging_pipeline_keeps_valid_operational_metadata(
     assert payload["status"] == "ok"
     assert payload["error_code"] == "RATE_LIMITED"
     assert payload["attempt"] == 1
-    assert payload["object_id"].startswith("sha256:")
+    assert payload["object_id"].startswith("hmac-sha256:")
+
+
+def test_object_id_pseudonym_uses_the_canonical_parsed_identity() -> None:
+    """Break caught: whitespace-equivalent object IDs can fragment operational correlation."""
+    assert _pseudonymize_object_id(" stuttgart:course:12345 ") == _pseudonymize_object_id(
+        "stuttgart:course:12345"
+    )
+
+
+def test_object_id_pseudonyms_are_distinct_and_not_offline_enumerable(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Break caught: raw or unsalted object IDs can be recovered from operational logs."""
+    first_id = "stuttgart:course:12345"
+    second_id = "stuttgart:course:67890"
+    configure_logging("INFO")
+    logger = logging.getLogger("ilias_mcp.runtime")
+    logger.info("first", extra={"object_id": first_id})
+    logger.info("second", extra={"object_id": second_id})
+
+    captured = capsys.readouterr()
+    pseudonyms = [json.loads(line)["object_id"] for line in captured.err.splitlines()]
+
+    assert pseudonyms[0] != pseudonyms[1]
+    assert pseudonyms[0] != f"sha256:{hashlib.sha256(first_id.encode()).hexdigest()}"
+    assert first_id not in captured.err
+    assert second_id not in captured.err
 
 
 def test_stderr_logging_pipeline_redacts_nonprimitive_nominally_safe_values(

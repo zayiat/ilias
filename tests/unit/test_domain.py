@@ -71,6 +71,35 @@ def test_learning_object_requires_its_declared_object_type_to_match_its_id() -> 
         )
 
 
+@pytest.mark.parametrize("raw_instance_type", [None, "", "   ", "x" * 129])
+def test_unknown_learning_object_requires_a_bounded_nonblank_raw_instance_type(
+    raw_instance_type: str | None,
+) -> None:
+    """Break caught: an unknown object can lose the raw type needed for forward compatibility."""
+    with pytest.raises(ValidationError, match="raw_instance_type"):
+        LearningObject(
+            id=ObjectId.parse("stuttgart:unknown:17"),
+            object_type=ObjectType.UNKNOWN,
+            raw_instance_type=raw_instance_type,
+            title="New object",
+            course_id=ObjectId.parse("stuttgart:course:12345"),
+            provenance=provenance(),
+        )
+
+
+def test_known_learning_object_keeps_raw_instance_type_optional() -> None:
+    """Break caught: conditional unknown-type validation could reject established object types."""
+    learning_object = LearningObject(
+        id=ObjectId.parse("stuttgart:file:17"),
+        object_type=ObjectType.FILE,
+        title="Exercise sheet",
+        course_id=ObjectId.parse("stuttgart:course:12345"),
+        provenance=provenance(),
+    )
+
+    assert learning_object.raw_instance_type is None
+
+
 @pytest.mark.parametrize("timestamp", ["2026-10-31T18:00:00", "2026-10-31", "31/10/2026 18:00"])
 def test_upcoming_item_requires_an_offset_aware_iso_timestamp(timestamp: str) -> None:
     with pytest.raises(ValidationError):
