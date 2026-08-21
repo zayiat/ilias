@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - Eren
 created_date: '2026-08-20 17:03'
-updated_date: '2026-08-21 13:53'
+updated_date: '2026-08-21 13:55'
 labels:
   - mcp
   - foundation
@@ -59,4 +59,6 @@ Plan Task 1 completed in commit d9ec22b. Added the locked Python 3.12 package fo
 Plan Task 1 review fix round 1 completed in commit c325d80. The domain is now protocol/filesystem-neutral, requires offset-aware timestamps without tzdata, enforces provenance-instance cohesion, and has complete stable-error coverage. Fresh verification: 30 focused/full tests passed; Ruff lint/format, mypy, uv lock check, and diff check passed. Full evidence is appended to the local Task 1 report.
 
 Plan Task 1 review fix round 2 completed in commit 7edd097. Added explicit coverage that a LearningObject primary ID from another instance is rejected while parent, course, and provenance remain on the configured instance. This was coverage completion: the existing validator passed the new test without production changes. Fresh verification: 19 focused domain tests and 31 full tests passed; Ruff lint/format, mypy, uv lock check, and diff check passed. Full evidence is appended to the local Task 1 report.
+
+Plan Task 1 (Python package and domain contract) completed under TDD and passed task-scoped spec/quality review after two fix rounds. Review corrections removed HTTP/filesystem/CLI coupling from the domain, removed the extra tzdata dependency, enforced cross-instance identity cohesion, and expanded stable-error and timestamp validation coverage. Final Task 1 evidence: 31 tests passed plus Ruff, format, mypy, and uv lock checks.
 <!-- SECTION:NOTES:END -->
