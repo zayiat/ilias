@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - Eren
 created_date: '2026-08-20 17:03'
-updated_date: '2026-08-21 14:36'
+updated_date: '2026-08-21 14:42'
 labels:
   - mcp
   - foundation
@@ -65,4 +65,6 @@ Plan Task 1 review fix round 2 completed in commit 7edd097. Added explicit cover
 Plan Task 1 (Python package and domain contract) completed under TDD and passed task-scoped spec/quality review after two fix rounds. Review corrections removed HTTP/filesystem/CLI coupling from the domain, removed the extra tzdata dependency, enforced cross-instance identity cohesion, and expanded stable-error and timestamp validation coverage. Final Task 1 evidence: 31 tests passed plus Ruff, format, mypy, and uv lock checks.
 
 Final review fix wave started. Root-cause review confirmed three boundary issues: hostname safety checks run before IDNA canonicalization; LearningObject does not conditionally require raw_instance_type for unknown objects; logging validates but hashes the unparsed input with unsalted SHA-256. Scope remains limited to Plan Tasks 1-2.
+
+Final review fix wave completed in commit `80ec1a3` (`Harden identity canonicalization boundaries`). Strict TDD evidence: focused RED was 13 failed / 64 passed for the expected missing behaviors; focused GREEN was 77 passed. Fresh final verification: focused 77 passed, full 89 passed, Ruff check passed, Ruff format check reported 18 files formatted, mypy passed for 5 source files, uv lock check resolved 18 packages, and git diff check passed. The full local report is `.superpowers/sdd/2026-08-20-ilias-mcp-server-mvp/final-fix-report.md`; `progress.md` was not edited.
 <!-- SECTION:NOTES:END -->
