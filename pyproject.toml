@@ -5,6 +5,7 @@ description = "A local, read-only ILIAS MCP server."
 requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2.10,<3",
+    "tzdata>=2025.2,<2027",
 ]
 
 [project.scripts]

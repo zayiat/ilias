@@ -5,13 +5,33 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 import sys
 from datetime import UTC, datetime
 from typing import Any
 
+from ilias_mcp.domain import ObjectId
+from ilias_mcp.errors import ErrorCode
+
 REDACTED = "[REDACTED]"
-_SAFE_FIELDS = frozenset({"tool", "duration_ms", "status", "error_code", "attempt"})
 _STANDARD_LOG_RECORD_FIELDS = frozenset(logging.makeLogRecord({}).__dict__)
+_LOGGER_NAME_PATTERN = re.compile(r"ilias_mcp(?:\.[a-z][a-z0-9_]{0,63})*")
+_OPERATIONAL_TOOL_NAMES = frozenset(
+    {
+        "get_auth_status",
+        "list_courses",
+        "get_course",
+        "list_course_objects",
+        "get_object",
+        "list_upcoming_items",
+        "get_dashboard_context",
+        "download_file",
+        "extract_document_text",
+        "refresh_cache",
+    }
+)
+_OPERATIONAL_STATUSES = frozenset({"ok", "error", "started", "cancelled", "rate_limited"})
+_ERROR_CODES = frozenset(error_code.value for error_code in ErrorCode)
 
 
 class RedactionFilter(logging.Filter):
@@ -21,13 +41,14 @@ class RedactionFilter(logging.Filter):
         """Sanitize a record in place before any handler serializes it."""
         record.msg = REDACTED
         record.args = ()
+        record.name = _sanitize_logger_name(record.name)
         for field_name, value in list(record.__dict__.items()):
             if field_name in _STANDARD_LOG_RECORD_FIELDS:
                 continue
             if field_name == "object_id":
                 record.__dict__[field_name] = _anonymize(value)
-            elif field_name in _SAFE_FIELDS:
-                record.__dict__[field_name] = value
+            elif field_name in {"tool", "duration_ms", "status", "error_code", "attempt"}:
+                record.__dict__[field_name] = _sanitize_operational_field(field_name, value)
             else:
                 record.__dict__[field_name] = REDACTED
         return True
@@ -70,5 +91,36 @@ def configure_logging(level: str) -> None:
 
 def _anonymize(value: object) -> str:
     """Return a deterministic identifier suitable for operational correlation."""
+    try:
+        ObjectId.parse(str(value))
+    except ValueError:
+        return REDACTED
     digest = hashlib.sha256(str(value).encode("utf-8")).hexdigest()
     return f"sha256:{digest}"
+
+
+def _sanitize_logger_name(value: object) -> str:
+    """Keep only static package logger names out of the structured output."""
+    if isinstance(value, str) and _LOGGER_NAME_PATTERN.fullmatch(value):
+        return value
+    return "ilias_mcp.redacted"
+
+
+def _sanitize_operational_field(field_name: str, value: object) -> object:
+    """Preserve only bounded, schema-shaped operational metadata."""
+    if field_name == "tool" and isinstance(value, str) and value in _OPERATIONAL_TOOL_NAMES:
+        return value
+    if field_name == "status" and isinstance(value, str) and value in _OPERATIONAL_STATUSES:
+        return value
+    if field_name == "error_code" and isinstance(value, str) and value in _ERROR_CODES:
+        return value
+    if field_name == "duration_ms" and _is_bounded_integer(value, upper_bound=3_600_000):
+        return value
+    if field_name == "attempt" and _is_bounded_integer(value, upper_bound=100):
+        return value
+    return REDACTED
+
+
+def _is_bounded_integer(value: object, upper_bound: int) -> bool:
+    """Avoid accepting booleans or arbitrary objects as numeric log fields."""
+    return isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= upper_bound

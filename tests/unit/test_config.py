@@ -101,7 +101,17 @@ def test_settings_defaults_to_the_safe_stuttgart_configuration(
         "https://user:password@ilias3.uni-stuttgart.de",
         "https://ilias3.uni-stuttgart.de/login?token=secret",
         "https://localhost",
+        "https://localhost.",
+        "https://.",
         "https://127.0.0.1",
+        "https://127.0.0.1.",
+        "https://192.168.1.7",
+        "https://169.254.1.7",
+        "https://224.0.0.1",
+        "https://0.0.0.0",
+        "https://[::1]",
+        "https://ilias3.uni-stuttgart.de:70000",
+        "https://ilias3.uni-stuttgart.de:not-a-port",
     ],
 )
 def test_settings_rejects_unsafe_instance_urls(tmp_path: Path, url: str) -> None:
@@ -110,6 +120,62 @@ def test_settings_rejects_unsafe_instance_urls(tmp_path: Path, url: str) -> None
     config_path.write_text(f"[instance]\nurl = {url!r}\n", encoding="utf-8")
 
     with pytest.raises(ValidationError, match="instance URL"):
+        Settings.load(config_path)
+
+
+def test_settings_normalizes_a_trailing_dot_in_a_public_instance_hostname(tmp_path: Path) -> None:
+    """Break caught: equivalent public hostnames retain distinct canonical configuration values."""
+    config_path = tmp_path / "ilias-mcp.toml"
+    config_path.write_text(
+        '[instance]\nurl = "https://ilias3.uni-stuttgart.de./"\n', encoding="utf-8"
+    )
+
+    settings = Settings.load(config_path)
+
+    assert settings.instance_url == "https://ilias3.uni-stuttgart.de"
+
+
+@pytest.mark.parametrize("directory", ["", "~", "."])
+def test_settings_rejects_artifact_directory_values_that_resolve_to_a_root(
+    tmp_path: Path, directory: str
+) -> None:
+    """Break caught: an artifact directory can be the operator's home or configuration root."""
+    config_path = tmp_path / "ilias-mcp.toml"
+    config_path.write_text(f"[artifacts]\ndirectory = {directory!r}\n", encoding="utf-8")
+
+    with pytest.raises(ValidationError, match="artifact directory"):
+        Settings.load(config_path)
+
+
+def test_settings_rejects_a_filesystem_root_as_an_artifact_directory(tmp_path: Path) -> None:
+    """Break caught: artifact storage can be configured to write to the entire filesystem root."""
+    with pytest.raises(ValidationError, match="artifact directory"):
+        Settings(artifact_directory=Path(tmp_path.anchor))
+
+
+def test_settings_allows_an_operator_selected_absolute_or_parent_resolved_directory(
+    tmp_path: Path,
+) -> None:
+    """Break caught: trusted operators cannot select a safe external artifact location."""
+    config_directory = tmp_path / "configuration"
+    config_directory.mkdir()
+    config_path = config_directory / "ilias-mcp.toml"
+    config_path.write_text('[artifacts]\ndirectory = "../operator-artifacts"\n', encoding="utf-8")
+
+    settings = Settings.load(config_path)
+
+    assert settings.artifact_directory == (tmp_path / "operator-artifacts").resolve()
+
+
+@pytest.mark.parametrize("timezone", ["", "Mars/Olympus_Mons"])
+def test_settings_rejects_blank_or_nonexistent_iana_timezones(
+    tmp_path: Path, timezone: str
+) -> None:
+    """Break caught: event interpretation can silently use an invalid timezone."""
+    config_path = tmp_path / "ilias-mcp.toml"
+    config_path.write_text(f"[instance]\ntimezone = {timezone!r}\n", encoding="utf-8")
+
+    with pytest.raises(ValidationError, match="timezone"):
         Settings.load(config_path)
 
 

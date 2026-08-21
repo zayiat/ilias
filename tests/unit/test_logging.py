@@ -76,3 +76,106 @@ def test_configure_logging_emits_structured_redacted_logs_to_stderr_only(
     assert all(
         handler.stream is not sys.stdout for handler in logging.getLogger("ilias_mcp").handlers
     )
+
+
+def test_stderr_logging_pipeline_redacts_sensitive_values_from_all_output_slots(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Break caught: secret or authored values can bypass redaction through structured fields."""
+    values = {
+        "cookie": "cookie-1f7c8b",
+        "authorization": "Bearer auth-2d8e9f",
+        "password": "password-3a4b5c",
+        "csrf": "csrf-4d5e6f",
+        "session": "session-5a6b7c",
+        "access_token": "access-6b7c8d",
+        "api_token": "api-7c8d9e",
+        "query": "query-8d9e0f",
+        "content": "authored-9e0f1a",
+    }
+    configure_logging("INFO")
+    logger = logging.getLogger(f"ilias_mcp.{values['password']}")
+    logger.info(
+        "Cookie=%(cookie)s Authorization=%(authorization)s password=%(password)s "
+        "csrf=%(csrf)s session=%(session)s access_token=%(access_token)s "
+        "api_token=%(api_token)s https://example.invalid/?token=%(query)s %(content)s",
+        values,
+        extra={
+            "tool": values["access_token"],
+            "duration_ms": values["api_token"],
+            "status": values["content"],
+            "error_code": values["authorization"],
+            "attempt": values["session"],
+            "object_id": values["csrf"],
+            "content": values["content"],
+        },
+    )
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.err)
+
+    assert captured.out == ""
+    for value in values.values():
+        assert value not in captured.err
+        assert value.split("-", maxsplit=1)[0] not in captured.err
+    assert payload["tool"] == "[REDACTED]"
+    assert payload["duration_ms"] == "[REDACTED]"
+    assert payload["status"] == "[REDACTED]"
+    assert payload["error_code"] == "[REDACTED]"
+    assert payload["attempt"] == "[REDACTED]"
+    assert payload["object_id"] == "[REDACTED]"
+    assert payload["content"] == "[REDACTED]"
+    assert payload["logger"] == "ilias_mcp.redacted"
+
+
+def test_stderr_logging_pipeline_keeps_valid_operational_metadata(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Break caught: safe redaction removes the structured data needed for operations."""
+    configure_logging("INFO")
+    logging.getLogger("ilias_mcp.runtime").info(
+        "completed request",
+        extra={
+            "tool": "list_courses",
+            "duration_ms": 12,
+            "status": "ok",
+            "error_code": "RATE_LIMITED",
+            "attempt": 1,
+            "object_id": "stuttgart:course:12345",
+        },
+    )
+
+    payload = json.loads(capsys.readouterr().err)
+
+    assert payload["logger"] == "ilias_mcp.runtime"
+    assert payload["tool"] == "list_courses"
+    assert payload["duration_ms"] == 12
+    assert payload["status"] == "ok"
+    assert payload["error_code"] == "RATE_LIMITED"
+    assert payload["attempt"] == 1
+    assert payload["object_id"].startswith("sha256:")
+
+
+def test_stderr_logging_pipeline_redacts_nonprimitive_nominally_safe_values(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Break caught: malformed structured values raise or bypass the redaction filter."""
+    configure_logging("INFO")
+    logging.getLogger("ilias_mcp.runtime").info(
+        "completed request",
+        extra={
+            "tool": ["authored-value"],
+            "duration_ms": 1.5,
+            "status": {"authored-value"},
+            "error_code": ["AUTHENTICATION_REQUIRED"],
+            "attempt": True,
+        },
+    )
+
+    payload = json.loads(capsys.readouterr().err)
+
+    assert payload["tool"] == "[REDACTED]"
+    assert payload["duration_ms"] == "[REDACTED]"
+    assert payload["status"] == "[REDACTED]"
+    assert payload["error_code"] == "[REDACTED]"
+    assert payload["attempt"] == "[REDACTED]"

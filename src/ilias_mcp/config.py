@@ -8,8 +8,9 @@ import tomllib
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 
 from ilias_mcp.domain import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT, InstanceId
 
@@ -27,7 +28,7 @@ MAX_CONCURRENT_REQUESTS = 4
 class Settings(BaseModel):
     """Non-secret settings loaded from TOML with explicit environment overrides."""
 
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=True, validate_default=True)
 
     instance_id: InstanceId = Field(default_factory=lambda: InstanceId(value="stuttgart"))
     instance_url: str = DEFAULT_INSTANCE_URL
@@ -57,7 +58,11 @@ class Settings(BaseModel):
     @classmethod
     def validate_instance_url(cls, value: str) -> str:
         """Accept only credential-free public HTTPS base URLs."""
-        parsed = urlsplit(value)
+        try:
+            parsed = urlsplit(value)
+            port = parsed.port
+        except ValueError as error:
+            raise ValueError("instance URL must use a valid port") from error
         if (
             parsed.scheme != "https"
             or parsed.hostname is None
@@ -68,7 +73,9 @@ class Settings(BaseModel):
         ):
             raise ValueError("instance URL must be a credential-free HTTPS base URL")
 
-        hostname = parsed.hostname.lower()
+        hostname = parsed.hostname.rstrip(".").lower()
+        if not hostname:
+            raise ValueError("instance URL must include a hostname")
         if hostname == "localhost":
             raise ValueError("instance URL must not target localhost")
         try:
@@ -76,16 +83,60 @@ class Settings(BaseModel):
         except ValueError:
             pass
         else:
-            if not address.is_global:
+            if (
+                not address.is_global
+                or address.is_private
+                or address.is_link_local
+                or address.is_loopback
+                or address.is_reserved
+                or address.is_multicast
+                or address.is_unspecified
+            ):
                 raise ValueError("instance URL must not target a non-public IP address")
 
-        return urlunsplit(("https", parsed.netloc, parsed.path.rstrip("/"), "", ""))
+        canonical_host = f"[{hostname}]" if ":" in hostname else hostname
+        canonical_netloc = canonical_host if port is None else f"{canonical_host}:{port}"
+        return urlunsplit(("https", canonical_netloc, parsed.path.rstrip("/"), "", ""))
+
+    @field_validator("timezone")
+    @classmethod
+    def validate_timezone(cls, value: str) -> str:
+        """Require an installed IANA timezone database entry."""
+        timezone = value.strip()
+        if not timezone:
+            raise ValueError("timezone must not be blank")
+        try:
+            ZoneInfo(timezone)
+        except ZoneInfoNotFoundError as error:
+            raise ValueError("timezone must be a known IANA timezone") from error
+        return timezone
 
     @field_validator("artifact_directory", mode="before")
     @classmethod
-    def resolve_artifact_directory(cls, value: str | Path) -> Path:
+    def resolve_artifact_directory(cls, value: str | Path, info: ValidationInfo) -> Path:
         """Resolve the directory before later artifact code can use it."""
-        return Path(value).expanduser().resolve()
+        if isinstance(value, str) and not value.strip():
+            raise ValueError("artifact directory must not be blank")
+        configured_path = Path(value).expanduser()
+        configuration_root = Path(
+            (info.context or {}).get("configuration_root", Path.cwd())
+        ).resolve()
+        candidate = (
+            configured_path
+            if configured_path.is_absolute()
+            else configuration_root / configured_path
+        )
+        resolved_path = candidate.resolve()
+        if (
+            resolved_path == resolved_path.parent
+            or resolved_path == Path.home().resolve()
+            or resolved_path == configuration_root
+            or resolved_path == Path.cwd().resolve()
+        ):
+            raise ValueError(
+                "artifact directory must not resolve to a filesystem, home, or project root"
+            )
+        return resolved_path
 
     @model_validator(mode="after")
     def ensure_default_result_limit_is_bounded(self) -> Settings:
@@ -102,7 +153,7 @@ class Settings(BaseModel):
         if config_path is not None:
             values.update(_read_toml(config_path, base_directory))
         values.update(_environment_overrides(base_directory))
-        return cls.model_validate(values)
+        return cls.model_validate(values, context={"configuration_root": base_directory})
 
 
 def _read_toml(config_path: Path, base_directory: Path) -> dict[str, Any]:
@@ -142,8 +193,6 @@ def _read_toml(config_path: Path, base_directory: Path) -> dict[str, Any]:
             if toml_key not in raw_section:
                 continue
             value = raw_section[toml_key]
-            if settings_key == "artifact_directory":
-                value = base_directory / Path(value)
             values[settings_key] = value
     return values
 
@@ -168,8 +217,5 @@ def _environment_overrides(base_directory: Path) -> dict[str, str | Path]:
         value = os.environ.get(environment_name)
         if value is None:
             continue
-        if settings_name == "artifact_directory":
-            values[settings_name] = base_directory / Path(value)
-        else:
-            values[settings_name] = value
+        values[settings_name] = value
     return values
