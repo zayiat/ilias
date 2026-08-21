@@ -1,11 +1,11 @@
 ---
 id: TASK-001.01
 title: Establish the safe ILIAS MCP foundation
-status: In Progress
+status: Done
 assignee:
   - Eren
 created_date: '2026-08-20 17:03'
-updated_date: '2026-08-21 14:42'
+updated_date: '2026-08-21 14:46'
 labels:
   - mcp
   - foundation
@@ -13,6 +13,20 @@ dependencies: []
 documentation:
   - docs/superpowers/specs/2026-08-20-ilias-mcp-server-design.md
   - docs/superpowers/plans/2026-08-20-ilias-mcp-server-mvp.md
+modified_files:
+  - .backlog/tasks/task-001.01 - Establish-the-safe-ILIAS-MCP-foundation.md
+  - .env.example
+  - pyproject.toml
+  - src/ilias_mcp/__init__.py
+  - src/ilias_mcp/config.py
+  - src/ilias_mcp/domain.py
+  - src/ilias_mcp/errors.py
+  - src/ilias_mcp/logging.py
+  - tests/unit/test_config.py
+  - tests/unit/test_domain.py
+  - tests/unit/test_errors.py
+  - tests/unit/test_logging.py
+  - uv.lock
 parent_task_id: TASK-001
 priority: high
 type: task
@@ -27,10 +41,10 @@ Create the executable Python project foundation and stable normalized language u
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Namespaced instance and object identities, courses, learning objects, upcoming items, artifacts, pagination, provenance, and stable failures are validated through tests.
-- [ ] #2 Configuration rejects unsafe instance URLs and out-of-range cache, request, artifact, and result settings.
-- [ ] #3 Operational logs use stderr and automated tests prove that common credential, session, URL-token, and content values are redacted.
-- [ ] #4 The locked Python 3.12 project passes its focused tests, formatting, linting, and type checks.
+- [x] #1 Namespaced instance and object identities, courses, learning objects, upcoming items, artifacts, pagination, provenance, and stable failures are validated through tests.
+- [x] #2 Configuration rejects unsafe instance URLs and out-of-range cache, request, artifact, and result settings.
+- [x] #3 Operational logs use stderr and automated tests prove that common credential, session, URL-token, and content values are redacted.
+- [x] #4 The locked Python 3.12 project passes its focused tests, formatting, linting, and type checks.
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -67,4 +81,34 @@ Plan Task 1 (Python package and domain contract) completed under TDD and passed 
 Final review fix wave started. Root-cause review confirmed three boundary issues: hostname safety checks run before IDNA canonicalization; LearningObject does not conditionally require raw_instance_type for unknown objects; logging validates but hashes the unparsed input with unsalted SHA-256. Scope remains limited to Plan Tasks 1-2.
 
 Final review fix wave completed in commit `80ec1a3` (`Harden identity canonicalization boundaries`). Strict TDD evidence: focused RED was 13 failed / 64 passed for the expected missing behaviors; focused GREEN was 77 passed. Fresh final verification: focused 77 passed, full 89 passed, Ruff check passed, Ruff format check reported 18 files formatted, mypy passed for 5 source files, uv lock check resolved 18 packages, and git diff check passed. The full local report is `.superpowers/sdd/2026-08-20-ilias-mcp-server-mvp/final-fix-report.md`; `progress.md` was not edited.
+
+Final whole-branch review completed. The reviewer approved both controller rulings: conservative bounded numeric defaults and trusted operator-selected non-root artifact directories. A final fix wave closed Unicode/IDNA local-host aliases, required bounded raw types for unknown learning objects, and replaced enumerable object-ID hashes with canonical process-scoped HMAC pseudonyms. Scoped re-review found all Critical/Important findings addressed and declared the branch ready to merge. One non-blocking Minor remains: a test comparing keyed and unkeyed digest strings is partly guaranteed by their prefixes; production behavior and other HMAC tests remain valid.
+
+Objective finalization evidence on commit 366d3fa: `uv sync --locked` resolved/checked 18 packages; `uv run pytest -v` passed 89/89 tests on Python 3.12.12; `uv run ruff check .` passed; `uv run ruff format --check .` reported 18 files formatted; `uv run mypy src` reported no issues in 5 source files; `uv lock --check` passed; `git diff --check` passed; working tree was clean. This proves acceptance criteria 1-4.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+## Summary
+
+- Established the locked Python 3.12 `uv` project and immutable normalized domain contract for namespaced ILIAS identities, courses, learning objects, upcoming items, artifacts, pagination, provenance, trust metadata, and stable failures.
+- Added strict non-secret TOML/environment configuration with safe HTTPS/IDNA instance validation, bounded operational settings, portable IANA timezone validation, and resolved operator-controlled artifact locations.
+- Added structured stderr-only operational logging with conservative secret/content redaction, fixed output fields, and process-scoped HMAC object pseudonyms.
+- Kept later application, authentication, adapter, cache, artifact-store, extraction, CLI, and MCP work outside TASK-001.01.
+
+## Verification
+
+- `uv sync --locked`
+- `uv run pytest -v` — 89 passed
+- `uv run ruff check .`
+- `uv run ruff format --check .`
+- `uv run mypy src`
+- `uv lock --check`
+- `git diff --check`
+- Task-scoped reviews and final whole-branch review completed; no open Critical or Important findings.
+
+## Risk / follow-up
+
+A non-blocking test-quality minor remains around an assertion that compares keyed and unkeyed digest strings with different prefixes. The HMAC implementation, canonicalization, correlation, distinctness, and raw-ID nonleakage are independently covered.
+<!-- SECTION:FINAL_SUMMARY:END -->
