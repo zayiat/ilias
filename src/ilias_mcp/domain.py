@@ -4,14 +4,10 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
-from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-BERLIN_TIMEZONE = ZoneInfo("Europe/Berlin")
 DEFAULT_PAGE_LIMIT = 50
 MAX_PAGE_LIMIT = 100
 
@@ -115,8 +111,8 @@ def _parse_timestamp(value: Any) -> datetime:
     else:
         raise ValueError("timestamp must be an ISO 8601 datetime")
 
-    if timestamp.tzinfo is None:
-        return timestamp.replace(tzinfo=BERLIN_TIMEZONE)
+    if timestamp.tzinfo is None or timestamp.utcoffset() is None:
+        raise ValueError("timestamp must include an explicit timezone offset")
     return timestamp
 
 
@@ -124,16 +120,15 @@ class Provenance(DomainModel):
     """Source and trust context for content or metadata visible to a client."""
 
     instance_id: InstanceId
-    canonical_url: str
+    canonical_reference: str = Field(min_length=1, max_length=2048)
     retrieved_at: datetime
     content_trust: TrustLevel = TrustLevel.UNTRUSTED
 
-    @field_validator("canonical_url")
+    @field_validator("canonical_reference")
     @classmethod
-    def require_absolute_http_url(cls, value: str) -> str:
-        parsed = urlsplit(value)
-        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-            raise ValueError("canonical URL must be an absolute HTTP(S) URL")
+    def reject_blank_canonical_reference(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("canonical reference cannot be blank")
         return value
 
     @field_validator("retrieved_at", mode="before")
@@ -155,6 +150,7 @@ class Course(DomainModel):
     def require_course_identity(self) -> Course:
         if self.id.object_type is not ObjectType.COURSE:
             raise ValueError("course ID must have object type course")
+        _ensure_instance_cohesion(self.provenance, self.id)
         return self
 
 
@@ -167,7 +163,7 @@ class LearningObject(DomainModel):
     description: str | None = None
     parent_id: ObjectId | None = None
     course_id: ObjectId
-    canonical_url: str | None = None
+    canonical_reference: str | None = None
     is_available: bool = True
     has_children: bool = False
     provenance: Provenance
@@ -179,6 +175,7 @@ class LearningObject(DomainModel):
             raise ValueError("object_type must match the object ID type")
         if self.course_id.object_type is not ObjectType.COURSE:
             raise ValueError("course_id must have object type course")
+        _ensure_instance_cohesion(self.provenance, self.id, self.parent_id, self.course_id)
         return self
 
 
@@ -209,6 +206,7 @@ class UpcomingItem(DomainModel):
     def require_course_identity(self) -> UpcomingItem:
         if self.course_id is not None and self.course_id.object_type is not ObjectType.COURSE:
             raise ValueError("course_id must have object type course")
+        _ensure_instance_cohesion(self.provenance, self.course_id, self.object_id)
         return self
 
 
@@ -216,7 +214,6 @@ class Artifact(DomainModel):
     """Metadata for a server-managed local file eligible for extraction."""
 
     id: str = Field(min_length=1)
-    local_path: Path
     media_type: str = Field(min_length=1)
     byte_size: int = Field(ge=0)
     checksum: str = Field(pattern=r"^[a-f0-9]{64}$")
@@ -227,6 +224,14 @@ class Artifact(DomainModel):
     @classmethod
     def normalize_expiry(cls, value: Any) -> datetime:
         return _parse_timestamp(value)
+
+
+def _ensure_instance_cohesion(provenance: Provenance, *object_ids: ObjectId | None) -> None:
+    if any(
+        object_id is not None and object_id.instance_id != provenance.instance_id
+        for object_id in object_ids
+    ):
+        raise ValueError("object IDs must match the provenance instance")
 
 
 class Page[ItemT](DomainModel):

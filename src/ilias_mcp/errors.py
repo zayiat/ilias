@@ -40,7 +40,7 @@ class IliasMcpError(Exception):
 
 class AuthenticationRequiredError(IliasMcpError):
     code = ErrorCode.AUTHENTICATION_REQUIRED
-    default_message = "Authentication is required. Run ilias-mcp auth login."
+    default_message = "Authentication is required."
 
 
 class PermissionDeniedError(IliasMcpError):

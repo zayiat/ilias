@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import pytest
 from pydantic import ValidationError
 
@@ -22,7 +20,7 @@ from ilias_mcp.domain import (
 def provenance() -> Provenance:
     return Provenance(
         instance_id=InstanceId(value="stuttgart"),
-        canonical_url="https://ilias3.uni-stuttgart.de/goto.php?target=crs_12345",
+        canonical_reference="course:12345",
         retrieved_at="2026-08-20T09:15:00+02:00",
     )
 
@@ -73,24 +71,13 @@ def test_learning_object_requires_its_declared_object_type_to_match_its_id() -> 
         )
 
 
-def test_upcoming_item_adds_berlin_timezone_to_naive_iso_timestamp() -> None:
-    item = UpcomingItem(
-        kind=UpcomingItemKind.DEADLINE,
-        title="Submit exercise",
-        timestamp="2026-10-31T18:00:00",
-        course_id=ObjectId.parse("stuttgart:course:12345"),
-        provenance=provenance(),
-    )
-
-    assert item.timestamp.isoformat() == "2026-10-31T18:00:00+01:00"
-
-
-def test_upcoming_item_rejects_non_iso_or_date_only_timestamps() -> None:
+@pytest.mark.parametrize("timestamp", ["2026-10-31T18:00:00", "2026-10-31", "31/10/2026 18:00"])
+def test_upcoming_item_requires_an_offset_aware_iso_timestamp(timestamp: str) -> None:
     with pytest.raises(ValidationError):
         UpcomingItem(
             kind=UpcomingItemKind.CALENDAR_EVENT,
             title="Tutorial",
-            timestamp="31/10/2026 18:00",
+            timestamp=timestamp,
             provenance=provenance(),
         )
 
@@ -99,6 +86,7 @@ def test_provenance_marks_authored_content_as_untrusted() -> None:
     source = provenance()
 
     assert source.content_trust is TrustLevel.UNTRUSTED
+    assert source.canonical_reference == "course:12345"
     assert source.retrieved_at.tzinfo is not None
 
 
@@ -106,12 +94,63 @@ def test_artifact_requires_a_sha256_checksum() -> None:
     with pytest.raises(ValidationError, match="checksum"):
         Artifact(
             id="artifact-1",
-            local_path=Path("C:/artifacts/artifact-1.pdf"),
             media_type="application/pdf",
             byte_size=128,
             checksum="not-a-checksum",
             provenance=provenance(),
             expires_at="2026-08-21T09:15:00+02:00",
+        )
+
+
+def test_course_rejects_an_identity_from_a_different_instance() -> None:
+    with pytest.raises(ValidationError, match="provenance"):
+        Course(
+            id=ObjectId.parse("other:course:12345"),
+            title="Software Engineering",
+            is_active=True,
+            provenance=provenance(),
+        )
+
+
+@pytest.mark.parametrize(
+    ("parent_id", "course_id"),
+    [
+        (None, ObjectId.parse("other:course:12345")),
+        (ObjectId.parse("other:folder:7"), ObjectId.parse("stuttgart:course:12345")),
+    ],
+)
+def test_learning_object_rejects_related_ids_from_a_different_instance(
+    parent_id: ObjectId | None, course_id: ObjectId
+) -> None:
+    with pytest.raises(ValidationError, match="provenance"):
+        LearningObject(
+            id=ObjectId.parse("stuttgart:file:17"),
+            object_type=ObjectType.FILE,
+            title="Exercise sheet",
+            parent_id=parent_id,
+            course_id=course_id,
+            provenance=provenance(),
+        )
+
+
+@pytest.mark.parametrize(
+    ("course_id", "object_id"),
+    [
+        (ObjectId.parse("other:course:12345"), None),
+        (None, ObjectId.parse("other:file:17")),
+    ],
+)
+def test_upcoming_item_rejects_related_ids_from_a_different_instance(
+    course_id: ObjectId | None, object_id: ObjectId | None
+) -> None:
+    with pytest.raises(ValidationError, match="provenance"):
+        UpcomingItem(
+            kind=UpcomingItemKind.DEADLINE,
+            title="Submit exercise",
+            timestamp="2026-10-31T18:00:00+01:00",
+            course_id=course_id,
+            object_id=object_id,
+            provenance=provenance(),
         )
 
 
