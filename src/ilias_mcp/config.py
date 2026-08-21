@@ -76,8 +76,10 @@ class Settings(BaseModel):
         hostname = parsed.hostname.rstrip(".").lower()
         if not hostname:
             raise ValueError("instance URL must include a hostname")
-        if hostname == "localhost":
+        if hostname in {"localhost", "localhost.localdomain"} or hostname.endswith(".localhost"):
             raise ValueError("instance URL must not target localhost")
+        if _is_legacy_ipv4_hostname(hostname):
+            raise ValueError("instance URL must not use a legacy IPv4 representation")
         try:
             address = ipaddress.ip_address(hostname)
         except ValueError:
@@ -151,12 +153,12 @@ class Settings(BaseModel):
         base_directory = (config_path.parent if config_path is not None else Path.cwd()).resolve()
         values: dict[str, Any] = {"artifact_directory": base_directory / ".ilias-mcp" / "artifacts"}
         if config_path is not None:
-            values.update(_read_toml(config_path, base_directory))
-        values.update(_environment_overrides(base_directory))
+            values.update(_read_toml(config_path))
+        values.update(_environment_overrides())
         return cls.model_validate(values, context={"configuration_root": base_directory})
 
 
-def _read_toml(config_path: Path, base_directory: Path) -> dict[str, Any]:
+def _read_toml(config_path: Path) -> dict[str, Any]:
     """Map the supported TOML sections to the flat settings model."""
     with config_path.open("rb") as config_file:
         raw_config = tomllib.load(config_file)
@@ -197,7 +199,7 @@ def _read_toml(config_path: Path, base_directory: Path) -> dict[str, Any]:
     return values
 
 
-def _environment_overrides(base_directory: Path) -> dict[str, str | Path]:
+def _environment_overrides() -> dict[str, str | Path]:
     """Read only documented non-secret override variables."""
     names = {
         "ILIAS_MCP_INSTANCE_ID": "instance_id",
@@ -219,3 +221,40 @@ def _environment_overrides(base_directory: Path) -> dict[str, str | Path]:
             continue
         values[settings_name] = value
     return values
+
+
+def _is_legacy_ipv4_hostname(hostname: str) -> bool:
+    """Detect historical numeric IPv4 spellings without a DNS lookup."""
+    components = hostname.split(".")
+    if not 1 <= len(components) <= 4:
+        return False
+    values = [_parse_legacy_ipv4_component(component) for component in components]
+    if any(value is None for value in values):
+        return False
+    numeric_values = [value for value in values if value is not None]
+    if len(components) == 4 and all(
+        component == str(value) and value <= 255
+        for component, value in zip(components, numeric_values, strict=True)
+    ):
+        return False
+
+    maximum_last_component = (1 << (8 * (5 - len(components)))) - 1
+    return all(value <= 255 for value in numeric_values[:-1]) and (
+        numeric_values[-1] <= maximum_last_component
+    )
+
+
+def _parse_legacy_ipv4_component(component: str) -> int | None:
+    """Parse decimal, octal, or hexadecimal components accepted by legacy URL stacks."""
+    if not component:
+        return None
+    try:
+        if component.lower().startswith("0x"):
+            return int(component[2:], 16)
+        if len(component) > 1 and component.startswith("0"):
+            return int(component, 8)
+        if component.isdecimal():
+            return int(component, 10)
+    except ValueError:
+        return None
+    return None

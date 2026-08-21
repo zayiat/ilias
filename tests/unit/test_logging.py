@@ -72,7 +72,7 @@ def test_configure_logging_emits_structured_redacted_logs_to_stderr_only(
     assert payload["object_id"].startswith("sha256:")
     assert "12345" not in captured.err
     assert "Private course material" not in captured.err
-    assert payload["content"] == "[REDACTED]"
+    assert "content" not in payload
     assert all(
         handler.stream is not sys.stdout for handler in logging.getLogger("ilias_mcp").handlers
     )
@@ -92,9 +92,11 @@ def test_stderr_logging_pipeline_redacts_sensitive_values_from_all_output_slots(
         "api_token": "api-7c8d9e",
         "query": "query-8d9e0f",
         "content": "authored-9e0f1a",
+        "logger_name": "hunter2",
+        "field_name": "api_token_secret123",
     }
     configure_logging("INFO")
-    logger = logging.getLogger(f"ilias_mcp.{values['password']}")
+    logger = logging.getLogger(f"ilias_mcp.{values['logger_name']}")
     logger.info(
         "Cookie=%(cookie)s Authorization=%(authorization)s password=%(password)s "
         "csrf=%(csrf)s session=%(session)s access_token=%(access_token)s "
@@ -108,6 +110,7 @@ def test_stderr_logging_pipeline_redacts_sensitive_values_from_all_output_slots(
             "attempt": values["session"],
             "object_id": values["csrf"],
             "content": values["content"],
+            values["field_name"]: values["api_token"],
         },
     )
 
@@ -124,8 +127,9 @@ def test_stderr_logging_pipeline_redacts_sensitive_values_from_all_output_slots(
     assert payload["error_code"] == "[REDACTED]"
     assert payload["attempt"] == "[REDACTED]"
     assert payload["object_id"] == "[REDACTED]"
-    assert payload["content"] == "[REDACTED]"
-    assert payload["logger"] == "ilias_mcp.redacted"
+    assert "content" not in payload
+    assert values["field_name"] not in payload
+    assert payload["logger"] == "ilias_mcp"
 
 
 def test_stderr_logging_pipeline_keeps_valid_operational_metadata(
@@ -147,7 +151,7 @@ def test_stderr_logging_pipeline_keeps_valid_operational_metadata(
 
     payload = json.loads(capsys.readouterr().err)
 
-    assert payload["logger"] == "ilias_mcp.runtime"
+    assert payload["logger"] == "ilias_mcp"
     assert payload["tool"] == "list_courses"
     assert payload["duration_ms"] == 12
     assert payload["status"] == "ok"

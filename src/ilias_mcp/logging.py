@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import re
 import sys
 from datetime import UTC, datetime
 from typing import Any
@@ -15,7 +14,6 @@ from ilias_mcp.errors import ErrorCode
 
 REDACTED = "[REDACTED]"
 _STANDARD_LOG_RECORD_FIELDS = frozenset(logging.makeLogRecord({}).__dict__)
-_LOGGER_NAME_PATTERN = re.compile(r"ilias_mcp(?:\.[a-z][a-z0-9_]{0,63})*")
 _OPERATIONAL_TOOL_NAMES = frozenset(
     {
         "get_auth_status",
@@ -41,7 +39,7 @@ class RedactionFilter(logging.Filter):
         """Sanitize a record in place before any handler serializes it."""
         record.msg = REDACTED
         record.args = ()
-        record.name = _sanitize_logger_name(record.name)
+        record.name = "ilias_mcp"
         for field_name, value in list(record.__dict__.items()):
             if field_name in _STANDARD_LOG_RECORD_FIELDS:
                 continue
@@ -50,7 +48,7 @@ class RedactionFilter(logging.Filter):
             elif field_name in {"tool", "duration_ms", "status", "error_code", "attempt"}:
                 record.__dict__[field_name] = _sanitize_operational_field(field_name, value)
             else:
-                record.__dict__[field_name] = REDACTED
+                del record.__dict__[field_name]
         return True
 
 
@@ -97,13 +95,6 @@ def _anonymize(value: object) -> str:
         return REDACTED
     digest = hashlib.sha256(str(value).encode("utf-8")).hexdigest()
     return f"sha256:{digest}"
-
-
-def _sanitize_logger_name(value: object) -> str:
-    """Keep only static package logger names out of the structured output."""
-    if isinstance(value, str) and _LOGGER_NAME_PATTERN.fullmatch(value):
-        return value
-    return "ilias_mcp.redacted"
 
 
 def _sanitize_operational_field(field_name: str, value: object) -> object:
